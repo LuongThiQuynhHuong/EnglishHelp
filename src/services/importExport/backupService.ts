@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import type { BackupV1, ImportSummary } from '@/models/Backup';
+import type { BackupFile, ImportSummary } from '@/models/Backup';
 import type { VocabularyRepository } from '@/services/database/vocabularyRepository';
 import { BACKUP_VERSION } from '@/constants/defaults';
 import { parseBackup, planImport } from './backupValidation';
@@ -9,7 +9,7 @@ import { parseBackup, planImport } from './backupValidation';
 export async function exportVocabulary(repository: VocabularyRepository): Promise<void> {
   const vocabularies = await repository.list();
   const exportedAt = new Date().toISOString();
-  const backup: BackupV1 = { version: BACKUP_VERSION, exportedAt, vocabularies };
+  const backup: BackupFile = { version: BACKUP_VERSION, exportedAt, vocabularies: vocabularies.map(({ userId: _userId, ...word }) => word) };
   const filename = `english-helper-${exportedAt.replace(/[:.]/g, '-')}.json`;
   const file = new File(Paths.cache, filename);
   file.create();

@@ -48,7 +48,7 @@ export function scoreReview(questions: Vocabulary[], answers: Record<string, str
     return { vocabulary, answer, status } as const;
   });
   const correct = scored.filter((entry) => entry.status === 'correct').length;
-  const incorrect = scored.filter((entry) => entry.status === 'incorrect').length;
-  const skipped = scored.length - correct - incorrect;
+  const skipped = scored.filter((entry) => entry.status === 'skipped').length;
+  const incorrect = scored.length - correct;
   return { total: scored.length, correct, incorrect, skipped, percentage: scored.length ? Math.round((correct / scored.length) * 100) : 0, answers: scored };
 }

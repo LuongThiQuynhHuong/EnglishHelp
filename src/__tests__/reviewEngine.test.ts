@@ -2,7 +2,7 @@ import type { Vocabulary } from '@/models/Vocabulary';
 import { reviewGroups, scoreReview, selectMostMistaken, selectNewest, selectRandom } from '@/services/review/reviewEngine';
 
 function word(id: string, createdAt: string, incorrectCount = 0, lastReviewedAt: string | null = null): Vocabulary {
-  return { id, word: id, vietnameseMeaning: 'nghĩa', englishMeaning: 'meaning', imageUrl: null, createdAt, updatedAt: createdAt, reviewCount: 0, correctCount: 0, incorrectCount, lastReviewedAt };
+  return { id, userId: 'user-a', wordClass: null, ipa: null, word: id, vietnameseMeaning: 'nghĩa', englishMeaning: 'meaning', imageUrl: null, createdAt, updatedAt: createdAt, reviewCount: 0, correctCount: 0, incorrectCount, lastReviewedAt };
 }
 
 const words = [word('c', '2026-01-03'), word('a', '2026-01-01'), word('b', '2026-01-02')];
@@ -24,8 +24,8 @@ it('prioritizes mistakes, then older reviews, and selects newest by creation', (
   expect(selectNewest(candidates, 2).map((item) => item.id)).toEqual(['c', 'b']);
 });
 
-it('separates correct, incorrect, and skipped without calling a new word mistaken', () => {
+it('counts skipped answers as incorrect while retaining their skipped status', () => {
   const result = scoreReview(words, { a: ' A ', b: 'wrong', c: '   ' });
-  expect(result).toMatchObject({ total: 3, correct: 1, incorrect: 1, skipped: 1, percentage: 33 });
+  expect(result).toMatchObject({ total: 3, correct: 1, incorrect: 2, skipped: 1, percentage: 33 });
   expect(result.answers.map((item) => item.status)).toEqual(['skipped', 'correct', 'incorrect']);
 });

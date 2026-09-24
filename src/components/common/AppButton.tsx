@@ -20,17 +20,18 @@ export function AppButton({ title, onPress, variant = 'primary', disabled = fals
       onPress={onPress}
       style={({ pressed }) => [styles.base, styles[variant], disabled && styles.disabled, pressed && styles.pressed, style]}
     >
-      <AppText style={variant === 'danger' ? styles.dangerText : styles.text}>{title}</AppText>
+      <AppText style={variant === 'danger' ? styles.dangerText : variant === 'secondary' ? styles.secondaryText : styles.text}>{title}</AppText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { minHeight: dimensions.touchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.placeholder },
+  base: { minHeight: dimensions.buttonHeight, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
+  primary: { backgroundColor: colors.primaryDark },
+  secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primaryDark },
   danger: { backgroundColor: colors.dangerSurface },
-  text: { fontWeight: '700', textAlign: 'center' },
+  text: { color: colors.surface, fontWeight: '700', textAlign: 'center' },
+  secondaryText: { color: colors.primaryDark, fontWeight: '700', textAlign: 'center' },
   dangerText: { color: colors.danger, fontWeight: '700', textAlign: 'center' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.75 },

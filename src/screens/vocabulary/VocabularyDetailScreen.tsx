@@ -13,8 +13,9 @@ import { useSettings } from '@/hooks/useSettings';
 import type { Vocabulary } from '@/models/Vocabulary';
 import { formatDate } from '@/utils/dateFormat';
 import { commonStyles } from '@/theme/styles';
-import { spacing } from '@/theme/tokens';
+import { colors, spacing } from '@/theme/tokens';
 import { openDictionary, type Dictionary } from '@/services/dictionary/dictionaryLinks';
+import { AppHeader } from '@/components/common/AppHeader';
 
 export default function VocabularyDetailScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -35,7 +36,7 @@ export default function VocabularyDetailScreen({ id }: { id: string }) {
   function confirmDelete() {
     Alert.alert(t('vocabulary.deleteTitle'), t('vocabulary.deleteMessage'), [
       { text: t('app.cancel'), style: 'cancel' },
-      { text: t('app.delete'), style: 'destructive', onPress: () => { void repository.delete(id).then(() => router.replace('/(tabs)/vocabulary')).catch((cause: unknown) => { if (__DEV__) console.error('Vocabulary delete failed', cause); Alert.alert(t('app.error'), t('vocabulary.deleteError')); }); } },
+      { text: t('app.delete'), style: 'destructive', onPress: () => { void repository.delete(id).then(() => router.replace('/(tabs)')).catch((cause: unknown) => { if (__DEV__) console.error('Vocabulary delete failed', cause); Alert.alert(t('app.error'), t('vocabulary.deleteError')); }); } },
     ]);
   }
 
@@ -45,17 +46,20 @@ export default function VocabularyDetailScreen({ id }: { id: string }) {
     catch (cause) { if (__DEV__) console.error('Dictionary opening failed', cause); Alert.alert(t('app.error'), t('dictionary.openError')); }
   }
 
-  if (loading) return <Screen><LoadingState label={t('app.loading')} /></Screen>;
-  if (error) return <Screen><ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /></Screen>;
-  if (!item) return <Screen><ErrorState message={t('vocabulary.notFound')} /><AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} /></Screen>;
-  return <Screen><AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} />
-    <AppText variant="title">{item.word}</AppText>
+  const fallbackHeader = <AppHeader title={t('vocabulary.title')} />;
+  if (loading) return <Screen header={fallbackHeader}><LoadingState label={t('app.loading')} /></Screen>;
+  if (error) return <Screen header={fallbackHeader}><ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /></Screen>;
+  if (!item) return <Screen header={fallbackHeader}><ErrorState message={t('vocabulary.notFound')} /></Screen>;
+  const header = <AppHeader title={item.word} actions={[
+    { icon: 'review', label: t('app.edit'), onPress: () => router.push({ pathname: '/vocabulary/[id]/edit', params: { id } }) },
+    { icon: 'delete', label: t('app.delete'), color: colors.danger, onPress: confirmDelete },
+  ]} />;
+  return <Screen header={header}>
+    {item.wordClass && <AppText variant="subtitle">{t(`wordClasses.${item.wordClass}`)}</AppText>}{item.ipa && <AppText>{item.ipa}</AppText>}
     <RemoteVocabularyImage url={item.imageUrl} />
     <View style={[commonStyles.card, { gap: spacing.sm }]}><AppText variant="subtitle">{t('vocabulary.vietnameseMeaning')}</AppText><AppText>{item.vietnameseMeaning}</AppText><AppText variant="subtitle">{t('vocabulary.englishMeaning')}</AppText><AppText>{item.englishMeaning}</AppText></View>
     <View style={[commonStyles.card, { gap: spacing.sm }]}><AppText>{t('vocabulary.dateAdded')}: {formatDate(item.createdAt, settings?.language ?? 'en')}</AppText><AppText>{t('vocabulary.reviewCount')}: {item.reviewCount}</AppText><AppText>{t('vocabulary.correctCount')}: {item.correctCount}</AppText><AppText>{t('vocabulary.incorrectCount')}: {item.incorrectCount}</AppText></View>
     <AppButton title={t('vocabulary.openOxford')} variant="secondary" onPress={() => void lookup('oxford')} />
     <AppButton title={t('vocabulary.openCambridge')} variant="secondary" onPress={() => void lookup('cambridge')} />
-    <AppButton title={t('app.edit')} onPress={() => router.push({ pathname: '/vocabulary/[id]/edit', params: { id } })} />
-    <AppButton title={t('app.delete')} variant="danger" onPress={confirmDelete} />
   </Screen>;
 }

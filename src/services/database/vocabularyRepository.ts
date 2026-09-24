@@ -4,17 +4,18 @@ import type { Vocabulary, VocabularyInput } from '@/models/Vocabulary';
 import { makeSearchText, normalizeSearchText, vocabularyContentKey } from '@/utils/searchNormalization';
 import { cleanVocabularyInput, validateVocabularyInput } from '@/utils/vocabularyValidation';
 import { toVocabulary, type VocabularyRow } from './rowMappers';
+import type { BackupVocabulary } from '@/models/Backup';
 
 export class VocabularyRepository {
-  constructor(private readonly db: SQLiteDatabase) {}
+  constructor(private readonly db: SQLiteDatabase, private readonly userId: string) {}
 
   async list(): Promise<Vocabulary[]> {
-    const rows = await this.db.getAllAsync<VocabularyRow>('SELECT * FROM vocabularies ORDER BY created_at DESC, id DESC');
+    const rows = await this.db.getAllAsync<VocabularyRow>('SELECT * FROM vocabularies WHERE user_id = ? ORDER BY created_at DESC, id DESC', this.userId);
     return rows.map(toVocabulary);
   }
 
   async get(id: string): Promise<Vocabulary | null> {
-    const row = await this.db.getFirstAsync<VocabularyRow>('SELECT * FROM vocabularies WHERE id = ?', id);
+    const row = await this.db.getFirstAsync<VocabularyRow>('SELECT * FROM vocabularies WHERE id = ? AND user_id = ?', id, this.userId);
     return row ? toVocabulary(row) : null;
   }
 
@@ -22,7 +23,7 @@ export class VocabularyRepository {
     // Escape LIKE wildcards from user input; the normalized field supports accent-insensitive search.
     const term = normalizeSearchText(query).replace(/[\\%_]/g, '\\$&');
     if (!term) return [];
-    const rows = await this.db.getAllAsync<VocabularyRow>("SELECT * FROM vocabularies WHERE search_text LIKE ? ESCAPE '\\' ORDER BY created_at DESC, id DESC", `%${term}%`);
+    const rows = await this.db.getAllAsync<VocabularyRow>("SELECT * FROM vocabularies WHERE user_id = ? AND search_text LIKE ? ESCAPE '\\' ORDER BY created_at DESC, id DESC", this.userId, `%${term}%`);
     return rows.map(toVocabulary);
   }
 
@@ -34,7 +35,7 @@ export class VocabularyRepository {
     const existing = await this.list();
     if (existing.some((item) => vocabularyContentKey(item.word, item.vietnameseMeaning, item.englishMeaning) === key)) throw new Error('duplicate');
     const now = new Date().toISOString();
-    const vocabulary: Vocabulary = { ...input, id: Crypto.randomUUID(), createdAt: now, updatedAt: now, reviewCount: 0, correctCount: 0, incorrectCount: 0, lastReviewedAt: null };
+    const vocabulary: Vocabulary = { ...input, id: Crypto.randomUUID(), userId: this.userId, createdAt: now, updatedAt: now, reviewCount: 0, correctCount: 0, incorrectCount: 0, lastReviewedAt: null };
     await this.insert(vocabulary);
     return vocabulary;
   }
@@ -49,28 +50,28 @@ export class VocabularyRepository {
     const existing = await this.list();
     if (existing.some((item) => item.id !== id && vocabularyContentKey(item.word, item.vietnameseMeaning, item.englishMeaning) === key)) throw new Error('duplicate');
     const updated = { ...current, ...input, updatedAt: new Date().toISOString() };
-    await this.db.runAsync('UPDATE vocabularies SET word = ?, vietnamese_meaning = ?, english_meaning = ?, image_url = ?, updated_at = ?, search_text = ? WHERE id = ?', updated.word, updated.vietnameseMeaning, updated.englishMeaning, updated.imageUrl, updated.updatedAt, makeSearchText(updated.word, updated.vietnameseMeaning, updated.englishMeaning), id);
+    await this.db.runAsync('UPDATE vocabularies SET word = ?, word_class = ?, ipa = ?, vietnamese_meaning = ?, english_meaning = ?, image_url = ?, updated_at = ?, search_text = ? WHERE id = ? AND user_id = ?', updated.word, updated.wordClass, updated.ipa, updated.vietnameseMeaning, updated.englishMeaning, updated.imageUrl, updated.updatedAt, makeSearchText(updated.word, updated.vietnameseMeaning, updated.englishMeaning), id, this.userId);
     return updated;
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.runAsync('DELETE FROM vocabularies WHERE id = ?', id);
+    await this.db.runAsync('DELETE FROM vocabularies WHERE id = ? AND user_id = ?', id, this.userId);
   }
 
   async insert(vocabulary: Vocabulary): Promise<void> {
-    await this.db.runAsync('INSERT INTO vocabularies (id, word, vietnamese_meaning, english_meaning, image_url, created_at, updated_at, review_count, correct_count, incorrect_count, last_reviewed_at, search_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', vocabulary.id, vocabulary.word, vocabulary.vietnameseMeaning, vocabulary.englishMeaning, vocabulary.imageUrl, vocabulary.createdAt, vocabulary.updatedAt, vocabulary.reviewCount, vocabulary.correctCount, vocabulary.incorrectCount, vocabulary.lastReviewedAt, makeSearchText(vocabulary.word, vocabulary.vietnameseMeaning, vocabulary.englishMeaning));
+    await this.db.runAsync('INSERT INTO vocabularies (id, user_id, word, word_class, ipa, vietnamese_meaning, english_meaning, image_url, created_at, updated_at, review_count, correct_count, incorrect_count, last_reviewed_at, search_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', vocabulary.id, this.userId, vocabulary.word, vocabulary.wordClass, vocabulary.ipa, vocabulary.vietnameseMeaning, vocabulary.englishMeaning, vocabulary.imageUrl, vocabulary.createdAt, vocabulary.updatedAt, vocabulary.reviewCount, vocabulary.correctCount, vocabulary.incorrectCount, vocabulary.lastReviewedAt, makeSearchText(vocabulary.word, vocabulary.vietnameseMeaning, vocabulary.englishMeaning));
   }
 
-  async insertMany(records: Vocabulary[]): Promise<void> {
+  async insertMany(records: BackupVocabulary[]): Promise<void> {
     await this.db.withExclusiveTransactionAsync(async (tx) => {
       for (const item of records) {
-        await tx.runAsync('INSERT INTO vocabularies (id, word, vietnamese_meaning, english_meaning, image_url, created_at, updated_at, review_count, correct_count, incorrect_count, last_reviewed_at, search_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', item.id, item.word, item.vietnameseMeaning, item.englishMeaning, item.imageUrl, item.createdAt, item.updatedAt, item.reviewCount, item.correctCount, item.incorrectCount, item.lastReviewedAt, makeSearchText(item.word, item.vietnameseMeaning, item.englishMeaning));
+        await tx.runAsync('INSERT INTO vocabularies (id, user_id, word, word_class, ipa, vietnamese_meaning, english_meaning, image_url, created_at, updated_at, review_count, correct_count, incorrect_count, last_reviewed_at, search_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', Crypto.randomUUID(), this.userId, item.word, item.wordClass, item.ipa, item.vietnameseMeaning, item.englishMeaning, item.imageUrl, item.createdAt, item.updatedAt, item.reviewCount, item.correctCount, item.incorrectCount, item.lastReviewedAt, makeSearchText(item.word, item.vietnameseMeaning, item.englishMeaning));
       }
     });
   }
 
   async count(): Promise<number> {
-    const row = await this.db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM vocabularies');
+    const row = await this.db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM vocabularies WHERE user_id = ?', this.userId);
     return row?.count ?? 0;
   }
 }

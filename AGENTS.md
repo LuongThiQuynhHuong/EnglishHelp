@@ -6,15 +6,15 @@ English Helper is an Android/iOS React Native vocabulary learning app. It uses E
 
 ## Architecture and folders
 
-- `src/app/` holds thin Expo Router route files. Five tabs lead to Home, Vocabulary, Review, Search, and Settings. Keep screens in `src/screens/`.
+- `src/app/` holds thin Expo Router route files. Login and Sign Up are public; protected tabs are Home, Review, Settings, and Profile, with a center Add action. Keep screens in `src/screens/`.
 - `src/components/` holds small reusable UI. Check existing components before adding another.
 - `src/hooks/` connects screens to state and services. Keep database, filesystem, dictionary URLs, review selection, and backup parsing out of UI components.
-- `src/services/database/` owns SQL migrations and repositories. `src/services/review/` owns pure review logic and submission. `src/services/importExport/` owns backups.
+- `src/services/database/` owns SQL migrations and repositories. `src/services/auth/` owns local credential validation and hashing behind an auth service interface. `src/services/review/` owns pure review logic and submission. `src/services/importExport/` owns backups.
 - `src/models/` defines domain and backup types. `src/utils/` holds reusable normalization and validation. `src/theme/` and `src/i18n/` own design tokens and translation resources.
 
 Use PascalCase for components and model types, camelCase for functions and hooks, and descriptive names for SQL columns in snake_case. Prefer short functions with one purpose. Add comments for architectural reasons and non-obvious platform behavior, not self-evident statements.
 
-State is local to a screen unless multiple routes need it. `SettingsProvider` loads persisted settings and changes the bundled i18n language. `ReviewSessionProvider` holds an unfinished session in memory and guards against double submission. `useVocabularyList` refreshes when a route gains focus; screens never retain SQLite rows as an independent long-term source of truth.
+State is local to a screen unless multiple routes need it. `AuthProvider` restores the persisted session and owns the current user. `SettingsProvider` loads that user's settings and changes the bundled i18n language. `ReviewSessionProvider` holds an unfinished session in memory and guards against double submission; it unmounts at logout. `useVocabularyList` refreshes when a route gains focus; screens never retain SQLite rows as an independent long-term source of truth.
 
 ## Required rules
 
@@ -29,7 +29,7 @@ State is local to a screen unless multiple routes need it. `SettingsProvider` lo
 
 ## Database and vocabulary
 
-SQLite is the V1 source of truth. Migrations use `PRAGMA user_version`; never wipe user data on upgrade errors. `vocabularies` has UUID IDs, English word, both meanings, nullable `image_url`, UTC timestamps, review statistics, and a derived normalized search field. `settings` stores language and review group size. Repository calls use bound SQL parameters; multirow imports and review updates use transactions. Multiple records may share an English word when their meanings differ.
+SQLite is the V1 source of truth. Migrations use `PRAGMA user_version`; never wipe user data on upgrade errors. Schema version 2 adds local users, a persisted session, per-user settings, and vocabulary ownership, word class, and IPA. Existing words and review statistics are copied into the new schema, then claimed by the first registered account. Every vocabulary and settings repository operation must be scoped by the authenticated user ID. Repository calls use bound SQL parameters; multirow imports and review updates use transactions. Multiple records may share an English word when their meanings differ.
 
 `Vocabulary.imageUrl` is a remote HTTP/HTTPS URL or null. SQLite and backups never contain image bytes, Base64, or permanent local image paths. URL validation does not require a file extension. A failed remote preview shows a placeholder and does not block saving or reviewing. A future upload service may produce a URL for this same field; V1 has no image picker, camera, upload, or cloud-storage dependency.
 
@@ -37,7 +37,7 @@ SQLite is the V1 source of truth. Migrations use `PRAGMA user_version`; never wi
 
 Groups sort by creation date then ID, and divide by the current setting (default 30); labels display the dynamic word range. Random selection has no duplicates. Most mistaken sorts by incorrect count descending, then oldest review date, with never-reviewed first. Newest sorts by creation date descending. Answer comparison trims, collapses internal whitespace, and ignores case while preserving punctuation. Only submitted correct/incorrect answers change statistics; skipped answers do not. Active sessions are in memory and are discarded on restart.
 
-Backup V1 is JSON with `version: 1`, `exportedAt`, and `vocabularies`; image data is only `imageUrl`. Imports validate records and skip duplicate content based on normalized word and both meanings. An ID collision with different content is invalid. Settings are not included.
+Backup V2 is JSON with `version: 2`, `exportedAt`, and `vocabularies`, including word class and IPA. V1 imports default those fields to null. Image data is only `imageUrl`. Imports validate records, discard external `userId` values, bind records to the current user, and skip duplicate content based on normalized word and both meanings. An ID collision with different content is invalid. Settings and credentials are not included.
 
 ## Commands and testing
 

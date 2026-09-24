@@ -13,12 +13,13 @@ import type { Settings } from '@/models/Settings';
 import { useVocabulary } from '@/hooks/useVocabulary';
 import { exportVocabulary, importVocabulary } from '@/services/importExport/backupService';
 import { BackupValidationError } from '@/services/importExport/backupValidation';
+import { AppHeader } from '@/components/common/AppHeader';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { settings, loading, error, retry } = useSettings();
-  if (loading) return <Screen><LoadingState label={t('app.loading')} /></Screen>;
-  if (error || !settings) return <Screen><ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void retry()} /></Screen>;
+  if (loading) return <Screen header={<AppHeader title={t('settings.title')} leading="none" />}><LoadingState label={t('app.loading')} /></Screen>;
+  if (error || !settings) return <Screen header={<AppHeader title={t('settings.title')} leading="none" />}><ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void retry()} /></Screen>;
   return <SettingsContent settings={settings} />;
 }
 
@@ -56,7 +57,7 @@ function SettingsContent({ settings }: { settings: Settings }) {
     } finally { setBusy(false); }
   }
 
-  return <Screen><AppText variant="title">{t('settings.title')}</AppText>
+  return <Screen header={<AppHeader title={t('settings.title')} leading="none" />}>
     <AppText variant="subtitle">{t('settings.language')}</AppText>
     <View style={{ gap: spacing.md }}>
       <AppButton title={t('settings.english')} variant={settings.language === 'en' ? 'primary' : 'secondary'} onPress={() => { void setLanguage('en').catch((cause: unknown) => { if (__DEV__) console.error('Language save failed', cause); Alert.alert(t('app.error')); }); }} />

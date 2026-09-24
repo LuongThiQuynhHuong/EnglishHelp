@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/common/Screen';
-import { AppText } from '@/components/common/AppText';
 import { AppButton } from '@/components/common/AppButton';
+import { AppHeader } from '@/components/common/AppHeader';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -18,7 +18,7 @@ export default function ReviewGroupsScreen() {
   const { settings } = useSettings();
   const { start } = useReviewSession();
   const groups = reviewGroups(items, settings?.reviewGroupSize ?? DEFAULT_GROUP_SIZE);
-  return <Screen><AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} /><AppText variant="title">{t('review.selectGroup')}</AppText>
+  return <Screen header={<AppHeader title={t('review.selectGroup')} />}>
     {loading ? <LoadingState label={t('app.loading')} /> : error ? <ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /> : groups.length === 0 ? <EmptyState message={t('review.noWords')} /> : groups.map((group) => <AppButton key={group.number} title={t('review.groupLabel', { group: group.number, start: group.start, end: group.end })} variant="secondary" onPress={() => { start('group', group.words); router.push('/review/session'); }} />)}
   </Screen>;
 }

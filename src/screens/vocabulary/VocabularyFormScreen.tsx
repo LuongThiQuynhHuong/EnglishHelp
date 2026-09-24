@@ -4,18 +4,22 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/common/Screen';
 import { AppText } from '@/components/common/AppText';
-import { AppButton } from '@/components/common/AppButton';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { VocabularyFields } from '@/components/vocabulary/VocabularyFields';
 import { useVocabulary } from '@/hooks/useVocabulary';
 import { validateVocabularyInput } from '@/utils/vocabularyValidation';
 import { colors } from '@/theme/tokens';
+import type { WordClass } from '@/models/WordClass';
+import { AppHeader } from '@/components/common/AppHeader';
+import { FormActions } from '@/components/common/FormActions';
 
 export default function VocabularyFormScreen({ id }: { id?: string }) {
   const { t } = useTranslation();
   const repository = useVocabulary();
   const [word, setWord] = useState('');
+  const [wordClass, setWordClass] = useState<WordClass | null>('noun');
+  const [ipa, setIpa] = useState('');
   const [vietnameseMeaning, setVietnameseMeaning] = useState('');
   const [englishMeaning, setEnglishMeaning] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -30,19 +34,19 @@ export default function VocabularyFormScreen({ id }: { id?: string }) {
     void repository.get(id).then((item) => {
       if (!active) return;
       if (!item) { setLoadError(true); return; }
-      setWord(item.word); setVietnameseMeaning(item.vietnameseMeaning); setEnglishMeaning(item.englishMeaning); setImageUrl(item.imageUrl ?? '');
+      setWord(item.word); setWordClass(item.wordClass); setIpa(item.ipa ?? ''); setVietnameseMeaning(item.vietnameseMeaning); setEnglishMeaning(item.englishMeaning); setImageUrl(item.imageUrl ?? '');
     }).catch((cause: unknown) => { if (__DEV__) console.error('Vocabulary load failed', cause); if (active) setLoadError(true); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [id, repository]);
 
   async function save() {
-    const input = { word, vietnameseMeaning, englishMeaning, imageUrl: imageUrl || null };
+    const input = { word, wordClass, ipa: ipa || null, vietnameseMeaning, englishMeaning, imageUrl: imageUrl || null };
     const invalid = validateVocabularyInput(input);
     if (invalid) { setValidationError(invalid); return; }
     setValidationError(null); setSaving(true);
     try {
       const saved = id ? await repository.update(id, input) : await repository.create(input);
-      router.replace({ pathname: '/vocabulary/[id]', params: { id: saved.id } });
+      router.replace(id ? { pathname: '/vocabulary/[id]', params: { id: saved.id } } : '/(tabs)');
     } catch (cause) {
       if (__DEV__) console.error('Vocabulary save failed', cause);
       const message = cause instanceof Error && cause.message === 'duplicate' ? t('vocabulary.duplicate') : t('vocabulary.saveError');
@@ -50,11 +54,12 @@ export default function VocabularyFormScreen({ id }: { id?: string }) {
     } finally { setSaving(false); }
   }
 
-  if (loading) return <Screen><LoadingState label={t('app.loading')} /></Screen>;
-  if (loadError) return <Screen><ErrorState message={t('vocabulary.notFound')} /></Screen>;
-  return <Screen><AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} /><AppText variant="title">{id ? t('app.edit') : t('vocabulary.add')}</AppText>
-    <VocabularyFields word={word} onWordChange={setWord} vietnameseMeaning={vietnameseMeaning} onVietnameseChange={setVietnameseMeaning} englishMeaning={englishMeaning} onEnglishChange={setEnglishMeaning} imageUrl={imageUrl} onImageUrlChange={setImageUrl} imageError={validationError === 'invalidImageUrl' ? t('vocabulary.invalidImageUrl') : undefined} />
+  const title = id ? t('vocabulary.editWord') : t('vocabulary.addNew');
+  if (loading) return <Screen header={<AppHeader title={title} />}><LoadingState label={t('app.loading')} /></Screen>;
+  if (loadError) return <Screen header={<AppHeader title={title} />}><ErrorState message={t('vocabulary.notFound')} /></Screen>;
+  return <Screen header={<AppHeader title={title} />}>
+    <VocabularyFields word={word} onWordChange={setWord} wordClass={wordClass} onWordClassChange={setWordClass} ipa={ipa} onIpaChange={setIpa} vietnameseMeaning={vietnameseMeaning} onVietnameseChange={setVietnameseMeaning} englishMeaning={englishMeaning} onEnglishChange={setEnglishMeaning} imageUrl={imageUrl} onImageUrlChange={setImageUrl} imageError={validationError === 'invalidImageUrl' ? t('vocabulary.invalidImageUrl') : undefined} />
     {validationError === 'required' ? <AppText style={{ color: colors.danger }}>{t('vocabulary.required')}</AppText> : null}
-    <AppButton title={t('app.save')} onPress={() => void save()} disabled={saving} />
+    <FormActions onCancel={() => router.back()} onSave={() => void save()} saving={saving} />
   </Screen>;
 }

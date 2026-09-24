@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/common/Screen';
-import { AppText } from '@/components/common/AppText';
 import { AppButton } from '@/components/common/AppButton';
+import { AppHeader } from '@/components/common/AppHeader';
 import { FormField } from '@/components/common/FormField';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
@@ -30,7 +30,7 @@ export default function ReviewCountScreen({ mode }: { mode: ReviewMode }) {
     router.push('/review/session');
   }
 
-  return <Screen><AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} /><AppText variant="title">{t('review.chooseCount')}</AppText>
+  return <Screen header={<AppHeader title={t('review.chooseCount')} />}>
     {loading ? <LoadingState label={t('app.loading')} /> : error ? <ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /> : items.length === 0 ? <EmptyState message={t('review.noWords')} /> : <>
       {REVIEW_COUNT_PRESETS.filter((count) => count <= items.length).map((count) => <AppButton key={count} title={String(count)} variant={preset === count ? 'primary' : 'secondary'} onPress={() => { setPreset(count); setCustom(''); setInvalid(false); }} />)}
       <FormField label={t('review.customCount')} keyboardType="number-pad" value={custom} onChangeText={(value) => { setCustom(value); setPreset(null); setInvalid(false); }} error={invalid ? t('review.invalidCount', { max: items.length }) : undefined} />

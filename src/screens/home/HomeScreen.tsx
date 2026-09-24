@@ -1,38 +1,24 @@
-import { View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { AppHeader } from '@/components/common/AppHeader';
 import { Screen } from '@/components/common/Screen';
-import { AppText } from '@/components/common/AppText';
+import { AppIcon } from '@/components/common/AppIcon';
 import { EmptyState } from '@/components/common/EmptyState';
-import { AppButton } from '@/components/common/AppButton';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { VocabularyCard } from '@/components/vocabulary/VocabularyCard';
 import { useVocabularyList } from '@/hooks/useVocabularyList';
-import { useReviewSession } from '@/hooks/useReviewSession';
-import { selectRandom } from '@/services/review/reviewEngine';
-import { HOME_RECENT_COUNT, REVIEW_COUNT_PRESETS } from '@/constants/defaults';
-import { commonStyles } from '@/theme/styles';
-import { spacing } from '@/theme/tokens';
+import { normalizeSearchText } from '@/utils/searchNormalization';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 export default function HomeScreen() {
-  const { t } = useTranslation();
-  const { items, loading, error, refresh } = useVocabularyList();
-  const { start } = useReviewSession();
-  const reviewed = items.filter((item) => item.reviewCount > 0).length;
-
-  function quickStart() {
-    const selected = selectRandom(items, Math.min(REVIEW_COUNT_PRESETS[0], items.length));
-    start('random', selected);
-    router.push('/review/session');
-  }
-
-  return <Screen><AppText variant="title">{t('home.greeting')}</AppText>
-    {loading ? <LoadingState label={t('app.loading')} /> : error ? <ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /> : items.length === 0 ? <><EmptyState message={t('home.noWords')} /><AppButton title={t('vocabulary.add')} onPress={() => router.push('/vocabulary/new')} /></> : <>
-      <View style={[commonStyles.card, { gap: spacing.sm }]}><AppText>{t('home.total')}: {items.length}</AppText><AppText>{t('home.reviewed')}: {reviewed}</AppText><AppText>{t('home.new')}: {items.length - reviewed}</AppText></View>
-      <AppButton title={t('home.quickReview')} onPress={quickStart} />
-      <AppText variant="subtitle">{t('home.recent')}</AppText>
-      {items.slice(0, HOME_RECENT_COUNT).map((item) => <VocabularyCard key={item.id} item={item} onPress={() => router.push({ pathname: '/vocabulary/[id]', params: { id: item.id } })} />)}
-    </>}
+  const { t } = useTranslation(); const { items, loading, error, refresh } = useVocabularyList();
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(() => { const term = normalizeSearchText(query); return term ? items.filter((item) => normalizeSearchText(`${item.word} ${item.vietnameseMeaning} ${item.englishMeaning} ${item.ipa ?? ''} ${item.wordClass ?? ''}`).includes(term)) : items; }, [items, query]);
+  return <Screen scroll={false} header={<AppHeader title={t('home.yourVocabulary')} leading="menu" />} style={styles.content}><View style={styles.search}><AppIcon name="search" /><TextInput accessibilityLabel={t('search.placeholder')} placeholder={t('search.placeholder')} value={query} onChangeText={setQuery} style={styles.input} placeholderTextColor={colors.muted} />{!!query && <Pressable accessibilityLabel={t('search.clear')} onPress={() => setQuery('')}><AppIcon name="close" /></Pressable>}</View>
+    {loading ? <LoadingState label={t('app.loading')} /> : error ? <ErrorState message={t('app.error')} retryLabel={t('app.retry')} onRetry={() => void refresh()} /> : <FlatList data={filtered} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} ListEmptyComponent={<EmptyState message={query ? t('search.noResults') : t('home.noWords')} />} renderItem={({ item }) => <VocabularyCard item={item} onPress={() => router.push({ pathname: '/vocabulary/[id]', params: { id: item.id } })} />} />}
   </Screen>;
 }
+const styles = StyleSheet.create({ content: { padding: 0, gap: 0 }, search: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 10, alignItems: 'center', paddingHorizontal: spacing.md, minHeight: 54, gap: spacing.sm, margin: spacing.lg }, input: { flex: 1, color: colors.text, fontSize: typography.body }, list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, flexGrow: 1, backgroundColor: colors.background } });

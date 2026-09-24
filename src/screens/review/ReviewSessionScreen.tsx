@@ -2,12 +2,12 @@ import { Alert, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/common/Screen';
-import { AppText } from '@/components/common/AppText';
 import { AppButton } from '@/components/common/AppButton';
+import { AppHeader } from '@/components/common/AppHeader';
 import { FormField } from '@/components/common/FormField';
 import { ErrorState } from '@/components/common/ErrorState';
 import { ReviewPrompt } from '@/components/review/ReviewPrompt';
-import { ReviewProgress } from '@/components/review/ReviewProgress';
+import { ReviewWordNavigation } from '@/components/review/ReviewWordNavigation';
 import { useReviewSession } from '@/hooks/useReviewSession';
 import { spacing } from '@/theme/tokens';
 
@@ -15,7 +15,7 @@ export default function ReviewSessionScreen() {
   const { t } = useTranslation();
   const { session, submitting, setAnswer, moveTo, skip, submit } = useReviewSession();
 
-  if (!session) return <Screen><ErrorState message={t('review.noSession')} /><AppButton title={t('app.back')} onPress={() => router.replace('/(tabs)/review')} /></Screen>;
+  if (!session) return <Screen header={<AppHeader title={t('review.title')} onLeadingPress={() => router.replace('/(tabs)/review')} />}><ErrorState message={t('review.noSession')} /></Screen>;
   const question = session.questions[session.currentIndex];
 
   function confirmSubmit() {
@@ -25,10 +25,8 @@ export default function ReviewSessionScreen() {
     ]);
   }
 
-  return <Screen>
-    <AppButton title={t('app.back')} variant="secondary" onPress={() => router.back()} disabled={submitting} />
-    <AppText variant="title">{t('review.title')}</AppText>
-    <ReviewProgress current={session.currentIndex + 1} total={session.questions.length} />
+  return <Screen header={<AppHeader title={t('review.title')} />}>
+    <ReviewWordNavigation session={session} disabled={submitting} onSelect={moveTo} />
     <ReviewPrompt word={question} />
     <FormField label={t('review.yourAnswer')} value={session.answers[question.id] ?? ''} onChangeText={setAnswer} autoCapitalize="none" autoCorrect={false} editable={!submitting} />
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>

@@ -8,6 +8,8 @@ import { LoadingState } from '@/components/common/LoadingState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Screen } from '@/components/common/Screen';
 import { ReviewSessionProvider } from './ReviewSessionProvider';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [databaseError, setDatabaseError] = useState(false);
@@ -26,7 +28,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <I18nextProvider i18n={i18n}>
+    <SafeAreaProvider><I18nextProvider i18n={i18n}>
       {databaseError ? (
         <Screen>
           <ErrorState message={i18n.t('app.error')} retryLabel={i18n.t('app.retry')} onRetry={retryDatabase} />
@@ -43,12 +45,16 @@ export function AppProviders({ children }: PropsWithChildren) {
               setDatabaseError(true);
             }}
           >
-            <SettingsProvider>
-              <ReviewSessionProvider>{children}</ReviewSessionProvider>
-            </SettingsProvider>
+            <AuthProvider><AuthenticatedProviders>{children}</AuthenticatedProviders></AuthProvider>
           </SQLiteProvider>
         </>
       )}
-    </I18nextProvider>
+    </I18nextProvider></SafeAreaProvider>
   );
+}
+
+function AuthenticatedProviders({ children }: PropsWithChildren) {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <>{children}</>;
+  return <SettingsProvider key={currentUser.id}><ReviewSessionProvider>{children}</ReviewSessionProvider></SettingsProvider>;
 }

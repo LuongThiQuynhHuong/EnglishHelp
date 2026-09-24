@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import i18n from '@/i18n';
 import type { Language, Settings } from '@/models/Settings';
 import { SettingsRepository } from '@/services/database/settingsRepository';
+import { useAuth } from './useAuth';
 
 type SettingsContextValue = {
   settings: Settings | null;
@@ -17,7 +18,8 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: PropsWithChildren) {
   const db = useSQLiteContext();
-  const repository = useMemo(() => new SettingsRepository(db), [db]);
+  const { currentUser } = useAuth();
+  const repository = useMemo(() => new SettingsRepository(db, currentUser?.id ?? ''), [db, currentUser?.id]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
