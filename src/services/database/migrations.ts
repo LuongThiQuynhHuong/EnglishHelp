@@ -7,8 +7,8 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA foreign_keys = ON');
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
-  if (version > 2) throw new Error('Database schema is newer than this app');
-  if (version === 2) return;
+  if (version > 3) throw new Error('Database schema is newer than this app');
+  if (version === 3) return;
 
   if (version === 0) await db.withExclusiveTransactionAsync(async (tx) => {
     await tx.execAsync(`
@@ -40,7 +40,7 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
 
   // Keep old rows and review counters intact. The first registered account claims this
   // reserved owner; later accounts receive separate data and preferences.
-  await db.withExclusiveTransactionAsync(async (tx) => {
+  if (version < 2) await db.withExclusiveTransactionAsync(async (tx) => {
     await tx.execAsync(`
       CREATE TABLE users (
         id TEXT PRIMARY KEY NOT NULL,
@@ -90,6 +90,14 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       CREATE INDEX idx_vocab_user_created ON vocabularies(user_id, created_at, id);
       CREATE INDEX idx_vocab_user_mistakes ON vocabularies(user_id, incorrect_count, last_reviewed_at);
       PRAGMA user_version = 2;
+    `);
+  });
+
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.execAsync(`
+      ALTER TABLE user_settings ADD COLUMN review_reminder INTEGER NOT NULL DEFAULT 0 CHECK (review_reminder IN (0, 1));
+      ALTER TABLE user_settings ADD COLUMN reminder_time TEXT NOT NULL DEFAULT '20:00' CHECK (reminder_time GLOB '[0-2][0-9]:[0-5][0-9]' AND reminder_time BETWEEN '00:00' AND '23:59');
+      PRAGMA user_version = 3;
     `);
   });
 }

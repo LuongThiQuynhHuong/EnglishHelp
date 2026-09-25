@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/common/Screen';
 import { AppText } from '@/components/common/AppText';
 import { AppButton } from '@/components/common/AppButton';
-import { spacing } from '@/theme/tokens';
+import { colors, dimensions, radius, spacing } from '@/theme/tokens';
 import { useSettings } from '@/hooks/useSettings';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingState } from '@/components/common/LoadingState';
@@ -25,11 +26,57 @@ export default function SettingsScreen() {
 
 function SettingsContent({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
-  const { setLanguage, setGroupSize } = useSettings();
+  const { setLanguage, setGroupSize, setReviewReminder, setReminderTime } = useSettings();
   const repository = useVocabulary();
   const [groupSize, setGroupSizeText] = useState(String(settings.reviewGroupSize));
   const [groupError, setGroupError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [draftTime, setDraftTime] = useState(settings.reminderTime);
+
+  function dateForTime(time: string): Date {
+    const [hour, minute] = time.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  }
+
+  async function changeReminder(enabled: boolean) {
+    setReminderBusy(true);
+    try {
+      const changed = await setReviewReminder(enabled);
+      if (!changed) Alert.alert(t('settings.permissionDeniedTitle'), t('settings.permissionDenied'));
+    } catch (cause) {
+      if (__DEV__) console.error('Reminder save failed', cause);
+      Alert.alert(t('app.error'), t('settings.reminderError'));
+    } finally { setReminderBusy(false); }
+  }
+
+  async function saveReminderTime(time: string) {
+    setReminderBusy(true);
+    try { await setReminderTime(time); }
+    catch (cause) {
+      if (__DEV__) console.error('Reminder time save failed', cause);
+      Alert.alert(t('app.error'), t('settings.reminderError'));
+    } finally { setReminderBusy(false); }
+  }
+
+  function openTimePicker() {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: dateForTime(settings.reminderTime),
+        mode: 'time',
+        is24Hour: true,
+        onChange: (event, date) => {
+          if (event.type === 'set' && date) void saveReminderTime(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`);
+        },
+      });
+    } else {
+      setDraftTime(settings.reminderTime);
+      setShowTimePicker(true);
+    }
+  }
 
   async function saveGroupSize() {
     const value = Number(groupSize);
@@ -66,8 +113,29 @@ function SettingsContent({ settings }: { settings: Settings }) {
     <AppText variant="subtitle">{t('settings.groupSize')}</AppText>
     <FormField label={t('settings.groupSize')} value={groupSize} onChangeText={(value) => { setGroupSizeText(value); setGroupError(false); }} keyboardType="number-pad" error={groupError ? t('settings.invalidGroupSize') : undefined} />
     <AppButton title={t('app.save')} onPress={() => void saveGroupSize()} />
+    <AppText variant="subtitle">{t('settings.reviewReminder')}</AppText>
+    <View style={styles.reminderRow}>
+      <AppText>{t('settings.reviewReminder')}</AppText>
+      <Switch accessibilityLabel={t('settings.reviewReminder')} accessibilityState={{ checked: settings.reviewReminder }} value={settings.reviewReminder} onValueChange={(enabled) => void changeReminder(enabled)} disabled={reminderBusy} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.surface} />
+    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel={t('settings.reminderTime')} disabled={reminderBusy} onPress={openTimePicker} style={styles.timeRow}>
+      <AppText>{t('settings.reminderTime')}</AppText>
+      <AppText>{settings.reminderTime}</AppText>
+    </Pressable>
+    {showTimePicker && Platform.OS === 'ios' ? <View>
+      <DateTimePicker value={dateForTime(draftTime)} mode="time" display="spinner" is24Hour onChange={(_event, date) => {
+        if (date) setDraftTime(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`);
+      }} />
+      <AppButton title={t('app.done')} disabled={reminderBusy} onPress={() => { setShowTimePicker(false); void saveReminderTime(draftTime); }} />
+      <AppButton title={t('app.cancel')} variant="secondary" onPress={() => setShowTimePicker(false)} />
+    </View> : null}
     <AppText variant="subtitle">{t('settings.export')}</AppText>
     <AppButton title={t('settings.export')} variant="secondary" onPress={() => void exportData()} disabled={busy} />
     <AppButton title={t('settings.import')} variant="secondary" onPress={() => void importData()} disabled={busy} />
   </Screen>;
 }
+
+const styles = StyleSheet.create({
+  reminderRow: { minHeight: dimensions.inputHeight, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timeRow: { minHeight: dimensions.inputHeight, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+});

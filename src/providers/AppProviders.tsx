@@ -1,4 +1,4 @@
-import { useCallback, useState, type PropsWithChildren } from 'react';
+import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { SQLiteProvider } from 'expo-sqlite';
 import i18n from '@/i18n';
@@ -10,6 +10,7 @@ import { Screen } from '@/components/common/Screen';
 import { ReviewSessionProvider } from './ReviewSessionProvider';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { syncReviewReminder } from '@/services/reminders/reviewReminder';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [databaseError, setDatabaseError] = useState(false);
@@ -54,7 +55,10 @@ export function AppProviders({ children }: PropsWithChildren) {
 }
 
 function AuthenticatedProviders({ children }: PropsWithChildren) {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading } = useAuth();
+  useEffect(() => {
+    if (!isLoading && !currentUser) void syncReviewReminder(null, null).catch((cause: unknown) => { if (__DEV__) console.error('Reminder cleanup failed', cause); });
+  }, [currentUser, isLoading]);
   if (!currentUser) return <>{children}</>;
   return <SettingsProvider key={currentUser.id}><ReviewSessionProvider>{children}</ReviewSessionProvider></SettingsProvider>;
 }
